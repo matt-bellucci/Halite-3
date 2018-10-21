@@ -1,3 +1,9 @@
-# Halite 3
+# Halite 3 bot
 
-A bot for the competition Halite 3.
+This is a bot coded in Python3 to play [Halite 3](https://halite.io/). It will compete against other bots.
+
+I will explore different strategies and models to create the best bot I can.
+
+## Approach 1: Hardcoding
+
+This approach is the simplest, I just hardcode my strategies, navigation etc.
