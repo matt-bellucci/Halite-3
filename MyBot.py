@@ -49,19 +49,20 @@ while True:
 	# You extract player metadata and the updated map metadata here for convenience.
 	me = game.me
 	game_map = game.game_map
-
+	directions = Direction.get_all_cardinals()
 	# A command queue holds all the commands you will run this turn. You build this list up and submit it at the
 	#   end of the turn.
 	command_queue = []
 	ship_moves = []
 	for ship in me.get_ships():
-		cell_list = cell_in_radius(ship,game_map,radius=3)
 		if ship.id not in ship_status:
-			ship_status[ship.id] = "exploring"
+			ship_status[ship.id] = "leaving"
+
 		if ship_status[ship.id] == "returning":
 			if ship.position == me.shipyard.position:
-				ship_status[ship.id] = "exploring"
-				nb_returning -= 1
+				ship_status[ship.id] = "leaving"
+				
+
 			else:
 				move = game_map.naive_navigate(ship, me.shipyard.position)
 				next_cell = map_cell_from_direction(ship,move,game_map)
@@ -69,20 +70,35 @@ while True:
 				ship_moves.append(next_cell)
 				command_queue.append(ship.move(move))
 				continue
+
 		elif ship.halite_amount >= constants.MAX_HALITE / 3 and nb_returning < 5 :
 			ship_status[ship.id] = "returning"
 			nb_returning += 1
 
+		elif ship_status[ship.id] == "leaving":
+
+			direction = directions[0]
+			i = 0
+			while i<len(directions)-1 and map_cell_from_direction(ship,direction,game_map).is_occupied:
+				i += 1
+				direction = directions[i]
+
+			next_cell = map_cell_from_direction(ship,direction,game_map)
+			next_cell.mark_unsafe(ship)
+			ship_moves.append(next_cell)
+			command_queue.append(ship.move(direction))
+
+			ship_status[ship.id] = "exploring"
+			nb_returning -= 1
 		else:
-			ship_direction = pick_next_cell(ship,game_map,ship_moves)
-			next_cell = map_cell_from_direction(ship,ship_direction,game_map)
-			cost_to_cell = cost(ship,next_cell.position, me.shipyard.position,game_map)
-			logging.info("Cost to {} = {}".format(next_cell.position, cost_to_cell))
+			best_cell = choose_best_move(ship,game_map,me.shipyard,radius=10)
+			move = game_map.naive_navigate(ship, best_cell.position)
+			next_cell = cell_from_direction(ship.position,move,game_map)
 			ship_moves.append(next_cell)
 			next_cell.mark_unsafe(ship)
-			command_queue.append(ship.move(ship_direction))
+			command_queue.append(ship.move(move))
 
-
+	logging.info("ship_status {}".format(ship_status))
 	
 	if game.turn_number <= 200 and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied:
 		command_queue.append(me.shipyard.spawn())
