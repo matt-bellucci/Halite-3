@@ -17,7 +17,7 @@ import random
 #   (print statements) are reserved for the engine-bot communication.
 import logging
 
-from hlt.pathing import pick_next_cell, cost, map_cell_from_direction
+from hlt.pathing import *
 
 
 
@@ -55,6 +55,7 @@ while True:
 	command_queue = []
 	ship_moves = []
 	for ship in me.get_ships():
+		cell_list = cell_in_radius(ship,game_map,radius=3)
 		if ship.id not in ship_status:
 			ship_status[ship.id] = "exploring"
 		if ship_status[ship.id] == "returning":

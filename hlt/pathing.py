@@ -54,3 +54,14 @@ def cost(ship,target,dropoff,game_map):
     ship_to_target = halite_cost(ship.position, target, game_map)
     target_to_dropoff = halite_cost(target, dropoff, game_map)
     return halite_amount - ship_to_target - target_to_dropoff
+
+def cell_in_radius(ship,game_map,radius=3):
+    init_pos = ship.position
+    cell_list = [init_pos]
+    for turn in range(radius):
+        for pos in cell_list:
+            positions = pos.get_surrounding_cardinals()
+            positions = [position for position in positions if position not in cell_list]
+        cell_list += positions
+    logging.info("Moves in radius = 3: {}".format(cell_list))
+    return cell_list
