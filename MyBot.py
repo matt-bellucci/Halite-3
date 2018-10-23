@@ -12,7 +12,7 @@ from hlt.positionals import Direction
 
 # This library allows you to generate random numbers.
 import random
-
+import time
 # Logging allows you to save messages for yourself. This is required because the regular STDOUT
 #   (print statements) are reserved for the engine-bot communication.
 import logging
@@ -43,6 +43,7 @@ logging.info("Successfully created bot! My Player ID is {}.".format(game.my_id))
 """ <<<Game Loop>>> """
 
 while True:
+	tic = time.time()
 	# This loop handles each turn of the game. The game object changes every turn, and you refresh that state by
 	#   running update_frame().
 	game.update_frame()
@@ -65,13 +66,22 @@ while True:
 
 			else:
 				move = game_map.naive_navigate(ship, me.shipyard.position)
+				if move == Direction.Still:
+					surrounds = ship.position.get_surrounding_cardinals()
+					safe_moves = [surround for surround in surrounds if (not game_map[surround].is_occupied and game_map[surround] not in ship_moves)]
+					if safe_moves:
+						safe_costs = [halite_cost(ship.position, surround, game_map) for surround in safe_moves]
+						choice = safe_moves[safe_costs.index(max(safe_costs))]
+						moves = game_map.get_unsafe_moves(ship.position, choice)
+						move = [move for move in moves if move != None][random.randint(0,len(moves)-1)]
+					logging.info(move)
 				next_cell = map_cell_from_direction(ship,move,game_map)
 				next_cell.mark_unsafe(ship)
 				ship_moves.append(next_cell)
 				command_queue.append(ship.move(move))
 				continue
 
-		elif ship.halite_amount >= constants.MAX_HALITE / 3 and nb_returning < 5 :
+		elif ship.halite_amount >= constants.MAX_HALITE / 3 and nb_returning < 4 :
 			ship_status[ship.id] = "returning"
 			nb_returning += 1
 
@@ -91,7 +101,7 @@ while True:
 			ship_status[ship.id] = "exploring"
 			nb_returning -= 1
 		else:
-			best_cell = choose_best_move(ship,game_map,me.shipyard,radius=10)
+			best_cell = choose_best_move(ship,game_map,me.shipyard,radius=30)
 			move = game_map.naive_navigate(ship, best_cell.position)
 			next_cell = cell_from_direction(ship.position,move,game_map)
 			ship_moves.append(next_cell)
@@ -100,8 +110,10 @@ while True:
 
 	logging.info("ship_status {}".format(ship_status))
 	
-	if game.turn_number <= 200 and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied:
+	if game.turn_number <= 200 and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied and len(me.get_ships())<12:
 		command_queue.append(me.shipyard.spawn())
 
 	# Send your moves back to the game environment, ending this turn.
+	tac = time.time()
 	game.end_turn(command_queue)
+	logging.info("Time for turn = {}s".format(tac-tic))
