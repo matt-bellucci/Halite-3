@@ -3,6 +3,8 @@ from hlt import constants
 from hlt.positionals import Direction,Position
 from hlt.game_map import GameMap
 import logging
+import random
+
 directions = Direction.get_all_cardinals()
 
 
@@ -92,3 +94,24 @@ def choose_best_move(ship,game_map,dropoff,radius=3):
     best_cell = Position(best_cell.x, best_cell.y)
     best_cell = game_map[best_cell]
     return best_cell
+
+def find_safe_direction(ship,game_map,ship_moves):
+    i = 0
+    all_moves = directions + [Direction.Still]
+    direction = all_moves[0]
+    cell = map_cell_from_direction(ship,direction,game_map)
+    while i<len(all_moves)-1 and (cell.is_occupied or cell in ship_moves) :
+        i += 1
+        direction = all_moves[i]
+    return direction
+
+def find_any_safe_direction(ship,game_map,ship_moves,cells_to_free):
+    safe_directions = []
+    for direction in directions:
+        cell = map_cell_from_direction(ship,direction,game_map)
+        if not (cell.is_occupied or cell in ship_moves or cell.position in cells_to_free):
+            safe_directions.append(direction)
+    if safe_directions:
+        return random.choice(safe_directions)
+    else:
+        return Direction.Still

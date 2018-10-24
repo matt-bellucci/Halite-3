@@ -28,12 +28,11 @@ from hlt.pathing import *
 # This game object contains the initial game state.
 game = hlt.Game()
 ship_status = {}
-nb_returning = 0
 # At this point "game" variable is populated with initial map data.
 # This is a good place to do computationally expensive start-up pre-processing.
 # As soon as you call "ready" function below, the 2 second per turn timer will start.
 game.ready("Shamrodia74's bot")
-
+cells_to_free = []
 
 
 # Now that your bot is initialized, save a message to yourself in the log file with some important information.
@@ -56,61 +55,89 @@ while True:
 	command_queue = []
 	ship_moves = []
 	for ship in me.get_ships():
-		if ship.id not in ship_status:
-			ship_status[ship.id] = "leaving"
-
-		if ship_status[ship.id] == "returning":
-			if ship.position == me.shipyard.position:
-				ship_status[ship.id] = "leaving"
-				
-
+		logging.info("Calculating ship {}".format(ship.id))
+		if ship.position in cells_to_free:
+			direction = find_any_safe_direction(ship,game_map,ship_moves,cells_to_free)
+			if direction == Direction.Still:
+				cells_to_free.append(ship.position.directional_offset(Direction.North))
 			else:
-				move = game_map.naive_navigate(ship, me.shipyard.position)
-				if move == Direction.Still:
-					surrounds = ship.position.get_surrounding_cardinals()
-					safe_moves = [surround for surround in surrounds if (not game_map[surround].is_occupied and game_map[surround] not in ship_moves)]
-					if safe_moves:
-						safe_costs = [halite_cost(ship.position, surround, game_map) for surround in safe_moves]
-						choice = safe_moves[safe_costs.index(max(safe_costs))]
-						moves = game_map.get_unsafe_moves(ship.position, choice)
-						move = [move for move in moves if move != None][random.randint(0,len(moves)-1)]
-					logging.info(move)
-				next_cell = map_cell_from_direction(ship,move,game_map)
+				cells_to_free = [cell for cell in cells_to_free if cell != ship.position]
+				cell = game_map[ship.position.directional_offset(direction)]
+				cell.mark_unsafe(ship)
+				ship_moves.append(cell)
+				command_queue.append(ship.move(direction))
+		else:
+
+			if ship.id not in ship_status:
+				ship_status[ship.id] = "leaving"
+
+
+			if ship.halite_amount >= constants.MAX_HALITE / 2 and (not game_map[me.shipyard].is_occupied) :
+				ship_status[ship.id] = "returning"
+					
+			if ship_status[ship.id] == "returning":
+				if ship.position == me.shipyard.position:
+					ship_status[ship.id] = "leaving"
+				else:
+					move = game_map.naive_navigate(ship, me.shipyard.position)
+					next_cell = map_cell_from_direction(ship,move,game_map)
+					if next_cell.position in cells_to_free:
+						best_cost = -1000
+						choice = Direction.Still
+						for direction in [d for d in directions if d != move]:
+							cell = ship.position.directional_offset(direction)
+							cell_cost = halite_cost(ship.position, cell, game_map)
+							logging.info("test: {}".format(cell))
+							game_cell = game_map[cell]
+							if not game_cell.is_occupied and not game_cell in ship_moves and cell_cost > best_cost:
+								best_cost = cell_cost
+								choice = direction
+						move = choice
+						
+					if move == Direction.Still:
+						move = find_any_safe_direction(ship,game_map,ship_moves,cells_to_free)
+					next_cell = map_cell_from_direction(ship,move,game_map)
+					next_cell.mark_unsafe(ship)
+					ship_moves.append(next_cell)
+					command_queue.append(ship.move(move))
+
+
+			elif ship_status[ship.id] == "leaving":
+
+				direction = find_safe_direction(ship,game_map,ship_moves)
+				if direction == Direction.Still:
+					cells_to_free.append(ship.position.directional_offset(Direction.North))
+				else:
+					ship_status[ship.id] = "exploring"
+				next_cell = map_cell_from_direction(ship,direction,game_map)
 				next_cell.mark_unsafe(ship)
 				ship_moves.append(next_cell)
+				command_queue.append(ship.move(direction))
+
+			else:
+				best_cell = choose_best_move(ship,game_map,me.shipyard,radius=20)
+				move = game_map.naive_navigate(ship, best_cell.position)
+				next_cell = cell_from_direction(ship.position,move,game_map)
+				if next_cell.position in cells_to_free:
+					best_cost = -1000
+					choice = Direction.Still
+					choices = [d for d in directions if d != move]
+					for direction in choices:
+						cell = ship.position.directional_offset(direction)
+						cell_cost = halite_cost(ship.position, cell, game_map)
+						game_cell = game_map[cell]
+						if (not game_cell.is_occupied) and game_cell not in ship_moves and cell_cost > best_cost:
+							best_cost = cell_cost
+							choice = direction
+					move = choice
+				next_cell = cell_from_direction(ship.position,move,game_map)
+				ship_moves.append(next_cell)
+				next_cell.mark_unsafe(ship)
 				command_queue.append(ship.move(move))
-				continue
-
-		elif ship.halite_amount >= constants.MAX_HALITE / 3 and nb_returning < 4 :
-			ship_status[ship.id] = "returning"
-			nb_returning += 1
-
-		elif ship_status[ship.id] == "leaving":
-
-			direction = directions[0]
-			i = 0
-			while i<len(directions)-1 and map_cell_from_direction(ship,direction,game_map).is_occupied:
-				i += 1
-				direction = directions[i]
-
-			next_cell = map_cell_from_direction(ship,direction,game_map)
-			next_cell.mark_unsafe(ship)
-			ship_moves.append(next_cell)
-			command_queue.append(ship.move(direction))
-
-			ship_status[ship.id] = "exploring"
-			nb_returning -= 1
-		else:
-			best_cell = choose_best_move(ship,game_map,me.shipyard,radius=30)
-			move = game_map.naive_navigate(ship, best_cell.position)
-			next_cell = cell_from_direction(ship.position,move,game_map)
-			ship_moves.append(next_cell)
-			next_cell.mark_unsafe(ship)
-			command_queue.append(ship.move(move))
 
 	logging.info("ship_status {}".format(ship_status))
-	
-	if game.turn_number <= 200 and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied and len(me.get_ships())<12:
+	logging.info("Cells to free {}".format(cells_to_free))
+	if game.turn_number <= 150 and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied and len(me.get_ships())<100:
 		command_queue.append(me.shipyard.spawn())
 
 	# Send your moves back to the game environment, ending this turn.
