@@ -50,6 +50,7 @@ while True:
 	me = game.me
 	game_map = game.game_map
 	directions = Direction.get_all_cardinals()
+	cells_to_free = [cell for cell in cells_to_free if game_map[cell].is_occupied]
 	# A command queue holds all the commands you will run this turn. You build this list up and submit it at the
 	#   end of the turn.
 	command_queue = []
@@ -104,7 +105,7 @@ while True:
 
 			elif ship_status[ship.id] == "leaving":
 
-				direction = find_safe_direction(ship,game_map,ship_moves)
+				direction = find_any_safe_direction(ship,game_map,ship_moves,cells_to_free)
 				if direction == Direction.Still:
 					cells_to_free.append(ship.position.directional_offset(Direction.North))
 				else:
@@ -115,7 +116,7 @@ while True:
 				command_queue.append(ship.move(direction))
 
 			else:
-				best_cell = choose_best_move(ship,game_map,me.shipyard,radius=20)
+				best_cell = choose_best_move(ship,game_map,me.shipyard,radius=10)
 				move = game_map.naive_navigate(ship, best_cell.position)
 				next_cell = cell_from_direction(ship.position,move,game_map)
 				if next_cell.position in cells_to_free:

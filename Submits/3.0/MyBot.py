@@ -115,7 +115,7 @@ while True:
 				command_queue.append(ship.move(direction))
 
 			else:
-				best_cell = choose_best_move(ship,game_map,me.shipyard,radius=20)
+				best_cell = choose_best_move(ship,game_map,me.shipyard,radius=10)
 				move = game_map.naive_navigate(ship, best_cell.position)
 				next_cell = cell_from_direction(ship.position,move,game_map)
 				if next_cell.position in cells_to_free:
