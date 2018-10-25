@@ -238,6 +238,24 @@ class GameMap:
 
         return Direction.Still
 
+    def navigate_exploring(self,me,ship,destination):
+        directions = Direction.get_all_cardinals()
+        move = self.naive_navigate(ship,destination)
+        next_cell = ship.position.directional_offset(move)
+        if next_cell == me.shipyard.position:
+            logging.info("move = {}".format(move))
+            opp_move = Direction.invert(move)
+            for direction in [d for d in (directions + [Direction.Still]) if d not in [move, opp_move]]:
+                target_pos = ship.position.directional_offset(direction)
+                if not self[target_pos].is_occupied:
+                    self[target_pos].mark_unsafe(ship)
+                    return direction
+        else:
+            return move
+
+
+
+
     @staticmethod
     def _generate():
         """

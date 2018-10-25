@@ -59,8 +59,6 @@ class Direction:
             return Direction.Still
         else:
             raise IndexError
-
-
 class Position:
     def __init__(self, x, y):
         self.x = x
